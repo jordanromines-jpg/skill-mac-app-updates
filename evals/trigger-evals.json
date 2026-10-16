@@ -1,0 +1,4 @@
+[
+ {"query": "A realistic, specific request that SHOULD use this skill (paths, context, casual wording)", "should_trigger": true},
+ {"query": "A near-miss that shares keywords but needs something else", "should_trigger": false}
+]

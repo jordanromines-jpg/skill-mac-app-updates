@@ -1,0 +1,2 @@
+# Files attached to each GitHub Release (one per line). init.py sets the name.
+dist/SKILL_NAME.skill

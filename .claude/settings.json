@@ -1,0 +1,14 @@
+{
+  "extraKnownMarketplaces": {
+    "plangraph": {
+      "source": {
+        "source": "github",
+        "repo": "jordanromines-jpg/plugin-plangraph",
+        "ref": "plugin-dist"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "plangraph@plangraph": true
+  }
+}

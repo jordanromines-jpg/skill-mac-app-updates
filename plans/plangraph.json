@@ -1,0 +1,13 @@
+{
+ "required_sections": [
+  "Why",
+  "Design",
+  "What this does NOT do",
+  "Decisions",
+  "Pull requests and keys",
+  "Verification",
+  "Build log",
+  "Results"
+ ],
+ "max_lines": 800
+}
