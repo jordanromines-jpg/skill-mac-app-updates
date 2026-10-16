@@ -1,0 +1,127 @@
+# Example release workflow for a self-built Mac app updated by Sparkle (skill-mac-app-updates).
+# Copy to .github/workflows/release.yml and change the env block. UNTESTED until Tether's first release.
+#
+# What it does on a tag push (v1.2.3): builds the app on a macOS runner, signs it with the ONE stable
+# self-signed identity from secrets, zips it, records a build attestation, and attaches the zip to a
+# DRAFT GitHub Release. It never signs the Sparkle update: the update key is deliberately absent here.
+# The releasing Mac verifies the attestation, signs with its keychain key, publishes the draft and
+# uploads the appcast (references/release-workflow.md).
+#
+# Secrets (Settings > Secrets and variables > Actions):
+#   MAC_SIGNING_P12_BASE64    base64 of the .p12 holding the self-signed code-signing identity
+#   MAC_SIGNING_P12_PASSWORD  that .p12's password
+# Variable:
+#   MAC_SIGNING_IDENTITY_SHA1 the identity's SHA-1 (security find-identity -v -p codesigning); the build
+#                             fails if the secret ever holds a different identity
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write           # create the draft release
+  id-token: write           # attestation: OIDC token for Sigstore
+  attestations: write       # attestation: store it
+  artifact-metadata: write  # attestation: artifact storage record
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  APP_NAME: MyApp                     # the .app's name, without .app
+  BUILD_SCRIPT: scripts/build-app.sh  # must write build/$APP_NAME.app and use $BUILD_NUMBER as CFBundleVersion
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Import the signing identity into a throwaway keychain
+        env:
+          P12_BASE64: ${{ secrets.MAC_SIGNING_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MAC_SIGNING_P12_PASSWORD }}
+          EXPECTED_SHA1: ${{ vars.MAC_SIGNING_IDENTITY_SHA1 }}
+        run: |
+          set -euo pipefail
+          [ -n "$P12_BASE64" ] && [ -n "$P12_PASSWORD" ] || { echo "::error::signing secrets are missing"; exit 1; }
+          [ -n "$EXPECTED_SHA1" ] || { echo "::error::variable MAC_SIGNING_IDENTITY_SHA1 is missing"; exit 1; }
+          KC="$RUNNER_TEMP/signing.keychain-db"
+          KC_PW="$(openssl rand -hex 24)"
+          printf '%s' "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/id.p12"
+          security create-keychain -p "$KC_PW" "$KC"
+          security set-keychain-settings -lut 3600 "$KC"
+          security unlock-keychain -p "$KC_PW" "$KC"
+          security import "$RUNNER_TEMP/id.p12" -k "$KC" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PW" "$KC" >/dev/null
+          rm -f "$RUNNER_TEMP/id.p12"
+          # codesign finds identities only in keychains on the search list.
+          KEYCHAINS=()
+          while IFS= read -r line; do KEYCHAINS+=("$(echo "$line" | sed -E 's/^ *"(.*)"$/\1/')"); done \
+            < <(security list-keychains -d user)
+          security list-keychains -d user -s "$KC" "${KEYCHAINS[@]}"
+          # Self-signed identities aren't trusted, so -v (valid only) would hide them: list all.
+          SHA1="$(security find-identity -p codesigning "$KC" | awk '$1=="1)" {print $2; exit}')"
+          [ "$SHA1" = "$EXPECTED_SHA1" ] || { echo "::error::signing identity $SHA1 is not the expected one; never change it"; exit 1; }
+          echo "SIGNING_KEYCHAIN=$KC" >> "$GITHUB_ENV"
+          echo "SIGNING_SHA1=$SHA1" >> "$GITHUB_ENV"
+
+      - name: Build the app
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          "$BUILD_SCRIPT"
+          test -d "build/$APP_NAME.app"
+          plutil -p "build/$APP_NAME.app/Contents/Info.plist" | grep -E 'CFBundleVersion|SUFeedURL|SUPublicEDKey'
+
+      - name: Sign inside out, never --deep
+        run: |
+          set -euo pipefail
+          APP="build/$APP_NAME.app"
+          sign() { codesign --force --sign "$SIGNING_SHA1" --keychain "$SIGNING_KEYCHAIN" --timestamp=none "$@"; }
+          FW="$APP/Contents/Frameworks/Sparkle.framework"
+          if [ -d "$FW" ]; then
+            # Order from Sparkle's sandboxing docs. No hardened runtime (-o runtime): without notarization it
+            # isn't needed, and its library validation wants a Team ID a self-signed identity doesn't have.
+            sign "$FW/Versions/B/XPCServices/Installer.xpc"
+            sign --preserve-metadata=entitlements "$FW/Versions/B/XPCServices/Downloader.xpc"
+            sign "$FW/Versions/B/Autoupdate"
+            sign "$FW/Versions/B/Updater.app"
+            sign "$FW"
+          fi
+          sign "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign --display -r- "$APP"
+
+      - name: Zip with ditto (keeps the framework's symlinks)
+        run: |
+          set -euo pipefail
+          ZIP="build/$APP_NAME-$VERSION.zip"
+          ditto -c -k --sequesterRsrc --keepParent "build/$APP_NAME.app" "$ZIP"
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+
+      - name: Attest where the zip was built
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ env.ZIP }}
+
+      - name: Attach to a draft release (the releasing Mac publishes it)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" "$ZIP" --draft --verify-tag \
+            --title "$APP_NAME $VERSION" \
+            --notes "Built by run $GITHUB_RUN_NUMBER. Draft until the releasing Mac verifies, signs and publishes it."
+
+      - name: Remove the throwaway keychain
+        if: always()
+        run: |
+          if [ -n "${SIGNING_KEYCHAIN:-}" ]; then security delete-keychain "$SIGNING_KEYCHAIN"; fi
