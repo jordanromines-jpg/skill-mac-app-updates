@@ -1,4 +1,22 @@
 [
- {"query": "A realistic, specific request that SHOULD use this skill (paths, context, casual wording)", "should_trigger": true},
- {"query": "A near-miss that shares keywords but needs something else", "should_trigger": false}
+ {"query": "I want Tether to update itself when I push a new version, like other Mac apps do. What's the setup?", "should_trigger": true},
+ {"query": "add sparkle to my swift package menu bar app so it checks github for updates", "should_trigger": true},
+ {"query": "Where should the SUPublicEDKey come from, and is it OK to keep the private half in a GitHub secret so CI can sign the appcast?", "should_trigger": true},
+ {"query": "write a github actions workflow that builds my macOS .app on a mac runner, codesigns it and uploads the zip to a release", "should_trigger": true},
+ {"query": "every time I ship a new build of my Mac app people have to re-grant Screen Recording and Accessibility. how do I stop that?", "should_trigger": true},
+ {"query": "My friend downloaded my app from GitHub and macOS says it can't verify it, and right-click Open doesn't work anymore on Sequoia. What do I tell her?", "should_trigger": true},
+ {"query": "generate_appcast keeps dropping my old versions from appcast.xml, is that expected?", "should_trigger": true},
+ {"query": "I don't want to pay $99 for a Developer ID. Can I still distribute my Mac app outside the App Store with auto-updates?", "should_trigger": true},
+ {"query": "how do I host the Sparkle appcast on GitHub Releases so the feed URL never changes?", "should_trigger": true},
+ {"query": "should I check the build attestation before I sign the update with sign_update on my Mac?", "should_trigger": true},
+ {"query": "Set up TestFlight for my iOS app and push a beta to my testers", "should_trigger": false},
+ {"query": "Update all my Homebrew packages and clean up old versions", "should_trigger": false},
+ {"query": "macOS Software Update is stuck on 'preparing' — how do I fix it?", "should_trigger": false},
+ {"query": "Write a GitHub Actions workflow that runs pytest on ubuntu for every pull request", "should_trigger": false},
+ {"query": "Add an auto-updater to my Electron app on Windows using electron-updater", "should_trigger": false},
+ {"query": "Submit my Mac app to the Mac App Store and fill in the App Store Connect listing", "should_trigger": false},
+ {"query": "Rotate the API keys in my Firebase project and move them to Secret Manager", "should_trigger": false},
+ {"query": "Grant Terminal Full Disk Access on my Mac", "should_trigger": false},
+ {"query": "release a new version of my Claude skill with release.py and update the hub submodule", "should_trigger": false},
+ {"query": "Sign this PDF contract and send it back", "should_trigger": false}
 ]
