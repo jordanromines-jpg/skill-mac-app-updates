@@ -1,9 +1,9 @@
 ---
-name: SKILL_NAME
+name: skill-mac-app-updates
 description: WHAT it does, in one sentence. Use this whenever <the situations, phrasings and file types that should trigger it, including ones where the user doesn't name it>. Also use it when <adjacent cases it should win>. Be specific and a little pushy; this text is what makes Claude pick the skill.
 ---
 
-# SKILL_TITLE
+# Mac App Updates
 
 One paragraph: what this skill does and which bundled script or reference does the heavy lifting. Tell Claude to run the bundled scripts rather than rewrite them.
 
